@@ -1,0 +1,33 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('otp_verifications', function (Blueprint $table) {
+
+            $table->id();
+
+            $table->foreignId('member_id')
+                  ->constrained('members')
+                  ->cascadeOnDelete();
+
+            $table->string('otp_code');
+
+            $table->dateTime('expired_at');
+
+            $table->dateTime('verified_at')->nullable();
+
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('otp_verifications');
+    }
+};
