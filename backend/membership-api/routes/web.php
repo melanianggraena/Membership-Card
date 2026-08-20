@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AdminAuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AdminPanelController;
+use App\Http\Controllers\PromoController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -49,6 +50,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/scan-nfc', [AdminPanelController::class, 'scanStore'])->name('scan.store');
     Route::get('/transactions', [AdminPanelController::class, 'transactions'])->name('transactions.index');
     Route::get('/access-history', [AdminPanelController::class, 'accesses'])->name('accesses.index');
+    Route::middleware('role:admin')->group(function () {
+        Route::resource('promos', PromoController::class)->except('show');
+    });
     Route::middleware('role:admin')->group(function () {
         Route::get('/admins', [AdminPanelController::class, 'admins'])->name('admins.index');
         Route::post('/admins', [AdminPanelController::class, 'storeAdmin'])->name('admins.store');

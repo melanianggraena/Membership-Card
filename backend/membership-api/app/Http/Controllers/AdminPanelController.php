@@ -26,7 +26,7 @@ class AdminPanelController extends Controller
     public function storeMember(Request $request)
     {
         $data = $request->validate(['full_name' => 'required|max:255', 'phone' => 'required|max:30|unique:members', 'email' => 'nullable|email|unique:members', 'nfc_uid' => 'nullable|max:255|unique:members', 'balance' => 'nullable|numeric|min:0', 'status' => ['required', Rule::in(['active', 'inactive'])], 'expired_at' => 'nullable|date']);
-        $data['member_code'] = 'MBR-'.now()->format('Y').'-'.str_pad((string) (Member::max('id') + 1), 4, '0', STR_PAD_LEFT);
+        $data['member_code'] = now()->format('Ym').str_pad((string) (Member::max('id') + 1), 3, '0', STR_PAD_LEFT);
         Member::create($data);
         return redirect()->route('members.index')->with('success', 'Member berhasil ditambahkan.');
     }
@@ -85,7 +85,7 @@ class AdminPanelController extends Controller
         $reason = ! $member ? 'Kartu tidak terdaftar' : ($member->status !== 'active' ? 'Member tidak aktif' : ($member->balance < $room->access_price ? 'Saldo tidak mencukupi' : 'Akses diberikan'));
         DB::transaction(function () use ($member, $room, $data, $success, $reason, $request) {
             $access = AccessHistory::create(['member_id' => $member?->id, 'room_id' => $room->id, 'uid' => $data['uid'], 'access_status' => $success ? 'success' : 'failed', 'reason' => $reason, 'scanned_at' => now()]);
-            if ($success) { $before = $member->balance; $member->update(['balance' => $before - $room->access_price, 'last_used' => now()]); Transaction::create(['member_id' => $member->id, 'admin_id' => $request->user()->id, 'room_id' => $room->id, 'transaction_type' => 'room_access', 'reference_id' => $access->id, 'amount' => $room->access_price, 'balance_before' => $before, 'balance_after' => $before - $room->access_price, 'status' => 'success']); }
+            if ($success) { $before = $member->balance; $member->update(['balance' => $before - $room->access_price, 'last_used' => now(), 'expired_at' => now()->addYear()]); Transaction::create(['member_id' => $member->id, 'admin_id' => $request->user()->id, 'room_id' => $room->id, 'transaction_type' => 'room_access', 'reference_id' => $access->id, 'amount' => $room->access_price, 'balance_before' => $before, 'balance_after' => $before - $room->access_price, 'status' => 'success']); }
         });
         return back()->with($success ? 'success' : 'error', $reason);
     }
