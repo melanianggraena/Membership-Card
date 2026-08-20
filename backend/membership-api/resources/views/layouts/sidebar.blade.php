@@ -1,7 +1,7 @@
 @php
 $nav = [
  ['dashboard','dashboard','layout-dashboard','Dashboard'], ['members.*','members.index','users','Member'],
- ['rooms.*','rooms.index','door-open','Ruangan'], ['topups.*','topups.index','wallet-cards','Top Up Saldo'],
+ ['rooms.*','rooms.index','door-open','Outlet'], ['topups.*','topups.index','wallet-cards','Top Up Saldo'],
  ['scan.*','scan.index','scan-line','Scan NFC'], ['transactions.*','transactions.index','receipt-text','Transaksi'],
  ['accesses.*','accesses.index','history','Riwayat Akses'], ['admins.*','admins.index','shield-user','Admin'],
  ['settings.*','settings.index','settings','Pengaturan'],

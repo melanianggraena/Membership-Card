@@ -47,12 +47,12 @@ class AdminPanelController extends Controller
     public function storeRoom(Request $request)
     {
         Room::create($request->validate(['room_name' => 'required|max:255', 'description' => 'nullable', 'access_price' => 'required|numeric|min:0', 'capacity' => 'required|integer|min:1', 'status' => ['required', Rule::in(['active', 'inactive'])]]));
-        return back()->with('success', 'Ruangan berhasil ditambahkan.');
+        return back()->with('success', 'Outlet berhasil ditambahkan.');
     }
     public function updateRoom(Request $request, Room $room)
     {
         $room->update($request->validate(['room_name' => 'required|max:255', 'description' => 'nullable', 'access_price' => 'required|numeric|min:0', 'capacity' => 'required|integer|min:1', 'status' => ['required', Rule::in(['active', 'inactive'])]]));
-        return back()->with('success', 'Ruangan berhasil diperbarui.');
+        return back()->with('success', 'Outlet berhasil diperbarui.');
     }
 
     public function topUps(Request $request)

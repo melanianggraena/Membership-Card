@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const form = modal.querySelector('[data-room-form]');
             form.action = `/rooms/${room.id}`;
             modal.querySelector('[data-method]').innerHTML = '<input type="hidden" name="_method" value="PUT">';
-            modal.querySelector('[data-room-title]').textContent = 'Edit Ruangan';
+            modal.querySelector('[data-room-title]').textContent = 'Edit Outlet';
             ['room_name','description','access_price','capacity','status'].forEach(key => { if (form.elements[key]) form.elements[key].value = room[key] ?? ''; });
         }
         modal?.classList.add('open'); backdrop?.classList.add('open');
