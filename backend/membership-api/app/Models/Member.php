@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-class Member extends Model
+class Member extends Authenticatable
 {
     use HasApiTokens;
     protected $fillable = ['member_code', 'full_name', 'phone', 'email', 'nfc_uid', 'balance', 'status', 'last_used', 'expired_at'];

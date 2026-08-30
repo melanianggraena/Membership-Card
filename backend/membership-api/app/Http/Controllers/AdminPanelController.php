@@ -8,9 +8,10 @@ use App\Models\Member;
 use App\Models\Room;
 use App\Models\TopUp;
 use App\Models\Transaction;
+use App\Services\AdminNotificationService;
+use App\Services\TransactionCodeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class AdminPanelController extends Controller
@@ -47,12 +48,12 @@ class AdminPanelController extends Controller
     public function storeRoom(Request $request)
     {
         Room::create($request->validate(['room_name' => 'required|max:255', 'description' => 'nullable', 'access_price' => 'required|numeric|min:0', 'capacity' => 'required|integer|min:1', 'status' => ['required', Rule::in(['active', 'inactive'])]]));
-        return back()->with('success', 'Outlet berhasil ditambahkan.');
+        return back()->with('success', 'Ruangan berhasil ditambahkan.');
     }
     public function updateRoom(Request $request, Room $room)
     {
         $room->update($request->validate(['room_name' => 'required|max:255', 'description' => 'nullable', 'access_price' => 'required|numeric|min:0', 'capacity' => 'required|integer|min:1', 'status' => ['required', Rule::in(['active', 'inactive'])]]));
-        return back()->with('success', 'Outlet berhasil diperbarui.');
+        return back()->with('success', 'Ruangan berhasil diperbarui.');
     }
 
     public function topUps(Request $request)
@@ -62,39 +63,50 @@ class AdminPanelController extends Controller
         $selected = $request->member ? Member::find($request->member) : null;
         return view('topups.index', compact('members', 'history', 'selected'));
     }
-    public function storeTopUp(Request $request)
+    public function storeTopUp(Request $request, TransactionCodeService $codes, AdminNotificationService $notifications)
     {
         $data = $request->validate(['member_id' => 'required|exists:members,id', 'amount' => 'required|numeric|min:1000', 'payment_method' => ['required', Rule::in(['cash', 'transfer', 'qris'])], 'notes' => 'nullable|max:500']);
-        DB::transaction(function () use ($data, $request) {
+        $transaction = DB::transaction(function () use ($data, $request, $codes) {
             $member = Member::lockForUpdate()->findOrFail($data['member_id']);
-            $before = $member->balance;
+            $before = (float) $member->balance;
             $topUp = TopUp::create($data + ['admin_id' => $request->user()->id]);
-            $member->increment('balance', $data['amount']);
-            Transaction::create(['member_id' => $member->id, 'admin_id' => $request->user()->id, 'transaction_type' => 'top_up', 'reference_id' => $topUp->id, 'amount' => $data['amount'], 'balance_before' => $before, 'balance_after' => $before + $data['amount'], 'status' => 'success']);
+            $after = $before + (float) $data['amount'];
+            $member->update(['balance' => $after]);
+            return Transaction::create(['transaction_code' => $codes->next(), 'member_id' => $member->id, 'admin_id' => $request->user()->id, 'transaction_type' => 'top_up', 'reference_id' => $topUp->id, 'amount' => $data['amount'], 'balance_before' => $before, 'balance_after' => $after, 'status' => 'success']);
         });
+        $transaction->load('member');
+        $notifications->send('top_up', 'Top Up berhasil', "Member {$transaction->member->member_code} melakukan top up Rp ".number_format((float) $transaction->amount, 0, ',', '.')." ({$transaction->transaction_code}).", route('transactions.show', $transaction));
         return back()->with('success', 'Top up saldo berhasil diproses.');
     }
 
     public function scan() { return view('scan.index', ['rooms' => Room::where('status', 'active')->get()]); }
-    public function scanStore(Request $request)
+    public function scanStore(Request $request, TransactionCodeService $codes, AdminNotificationService $notifications)
     {
         $data = $request->validate(['uid' => 'required', 'room_id' => 'required|exists:rooms,id']);
-        $member = Member::where('nfc_uid', $data['uid'])->first();
-        $room = Room::findOrFail($data['room_id']);
-        $success = $member && $member->status === 'active' && $member->balance >= $room->access_price;
-        $reason = ! $member ? 'Kartu tidak terdaftar' : ($member->status !== 'active' ? 'Member tidak aktif' : ($member->balance < $room->access_price ? 'Saldo tidak mencukupi' : 'Akses diberikan'));
-        DB::transaction(function () use ($member, $room, $data, $success, $reason, $request) {
+        $result = DB::transaction(function () use ($data, $request, $codes) {
+            $room = Room::lockForUpdate()->findOrFail($data['room_id']);
+            $member = Member::where('nfc_uid', $data['uid'])->lockForUpdate()->first();
+            $success = $member && $member->status === 'active' && $room->status === 'active' && (float) $member->balance >= (float) $room->access_price;
+            $reason = ! $member ? 'Kartu tidak terdaftar' : ($member->status !== 'active' ? 'Member tidak aktif' : ($room->status !== 'active' ? 'Ruangan tidak aktif' : ((float) $member->balance < (float) $room->access_price ? 'Saldo tidak mencukupi' : 'Akses diberikan')));
             $access = AccessHistory::create(['member_id' => $member?->id, 'room_id' => $room->id, 'uid' => $data['uid'], 'access_status' => $success ? 'success' : 'failed', 'reason' => $reason, 'scanned_at' => now()]);
-            if ($success) { $before = $member->balance; $member->update(['balance' => $before - $room->access_price, 'last_used' => now(), 'expired_at' => now()->addYear()]); Transaction::create(['member_id' => $member->id, 'admin_id' => $request->user()->id, 'room_id' => $room->id, 'transaction_type' => 'room_access', 'reference_id' => $access->id, 'amount' => $room->access_price, 'balance_before' => $before, 'balance_after' => $before - $room->access_price, 'status' => 'success']); }
+            $transaction = null;
+            if ($success) {
+                $before = (float) $member->balance;
+                $after = $before - (float) $room->access_price;
+                $member->update(['balance' => $after, 'last_used' => now(), 'expired_at' => now()->addYear()]);
+                $transaction = Transaction::create(['transaction_code' => $codes->next(), 'member_id' => $member->id, 'admin_id' => $request->user()->id, 'room_id' => $room->id, 'transaction_type' => 'room_access', 'reference_id' => $access->id, 'amount' => $room->access_price, 'balance_before' => $before, 'balance_after' => $after, 'status' => 'success']);
+            }
+            return compact('member', 'room', 'success', 'reason', 'transaction');
         });
-        return back()->with($success ? 'success' : 'error', $reason);
+        $memberCode = $result['member']?->member_code ?? $data['uid'];
+        $notifications->send('nfc_access', $result['success'] ? 'Akses NFC berhasil' : 'Akses NFC ditolak', "{$memberCode}: {$result['reason']} di {$result['room']->room_name}.", $result['transaction'] ? route('transactions.show', $result['transaction']) : route('accesses.index'));
+        return back()->with($result['success'] ? 'success' : 'error', $result['reason']);
     }
 
-    public function transactions(Request $request) { $transactions = Transaction::with(['member', 'admin', 'room'])->when($request->type, fn ($q, $v) => $q->where('transaction_type', $v))->latest()->paginate(12)->withQueryString(); return view('transactions.index', compact('transactions')); }
+    public function transactions(Request $request) { $transactions = Transaction::with(['member', 'admin', 'room', 'outlet'])->when($request->type, fn ($q, $v) => $q->where('transaction_type', $v))->when($request->status, fn ($q, $v) => $q->where('status', $v))->when($request->search, fn ($q, $v) => $q->where(fn ($q) => $q->where('transaction_code', 'like', "%{$v}%")->orWhereHas('member', fn ($q) => $q->where('member_code', 'like', "%{$v}%")->orWhere('full_name', 'like', "%{$v}%"))))->latest()->paginate(12)->withQueryString(); return view('transactions.index', compact('transactions')); }
+    public function transaction(Transaction $transaction) { $transaction->load(['member', 'admin', 'room', 'outlet']); return view('transactions.show', compact('transaction')); }
     public function accesses(Request $request) { $accesses = AccessHistory::with(['member', 'room'])->when($request->status, fn ($q, $v) => $q->where('access_status', $v))->latest('scanned_at')->paginate(12)->withQueryString(); return view('accesses.index', compact('accesses')); }
 
     public function admins() { return view('admins.index', ['admins' => Admin::latest()->paginate(10)]); }
     public function storeAdmin(Request $request) { $data = $request->validate(['name' => 'required|max:255', 'email' => 'required|email|unique:admins', 'password' => 'required|min:8|confirmed', 'role' => ['required', Rule::in(['admin', 'cashier'])]]); Admin::create($data); return back()->with('success', 'Admin berhasil ditambahkan.'); }
-    public function settings() { return view('settings.index'); }
-    public function updateProfile(Request $request) { $admin = $request->user(); $data = $request->validate(['name' => 'required|max:255', 'email' => ['required', 'email', Rule::unique('admins')->ignore($admin)], 'current_password' => 'nullable|required_with:password|current_password', 'password' => 'nullable|min:8|confirmed']); unset($data['current_password']); if (empty($data['password'])) unset($data['password']); $admin->update($data); return back()->with('success', 'Profil berhasil diperbarui.'); }
 }

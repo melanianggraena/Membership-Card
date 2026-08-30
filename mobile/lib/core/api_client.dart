@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class ApiClient {
   static const _storage = FlutterSecureStorage();
   static String get defaultBaseUrl => Platform.isAndroid
-      ? 'http://10.0.2.2:8000/api'
+      ? 'http://192.168.1.6:8000/api'
       : 'http://127.0.0.1:8000/api';
   late final Dio dio;
   Future<void> Function()? onUnauthorized;

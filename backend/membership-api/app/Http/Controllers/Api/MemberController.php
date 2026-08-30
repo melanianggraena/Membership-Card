@@ -17,8 +17,8 @@ class MemberController extends Controller
     public function membership(Request $r) { return $this->ok($this->member($r)); }
     public function balance(Request $r) { return $this->ok(['balance' => (float) $r->user()->balance]); }
     public function home(Request $r) { return $this->ok(['member' => $this->member($r), 'promos' => Promo::active()->latest('start_date')->get()]); }
-    public function transactions(Request $r) { return $this->ok($r->user()->transactions()->with('room:id,room_name')->latest()->paginate(15)); }
-    public function transaction(Request $r, int $id) { return $this->ok($r->user()->transactions()->with('room:id,room_name')->findOrFail($id)); }
+    public function transactions(Request $r) { return $this->ok($r->user()->transactions()->with(['room:id,room_name', 'outlet:id,outlet_code,outlet_name'])->latest()->paginate(15)); }
+    public function transaction(Request $r, int $id) { return $this->ok($r->user()->transactions()->with(['room:id,room_name', 'outlet:id,outlet_code,outlet_name'])->findOrFail($id)); }
     public function accesses(Request $r) { return $this->ok($r->user()->accessHistories()->with('room:id,room_name')->latest('scanned_at')->paginate(15)); }
     public function access(Request $r, int $id) { return $this->ok($r->user()->accessHistories()->with('room:id,room_name')->findOrFail($id)); }
     public function promos() { return $this->ok(Promo::active()->latest('start_date')->get()); }

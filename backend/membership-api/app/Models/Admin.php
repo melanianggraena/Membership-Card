@@ -36,4 +36,9 @@ class Admin extends Authenticatable
     {
         return $this->hasMany(Transaction::class);
     }
+
+    public function notificationPreference()
+    {
+        return $this->hasOne(NotificationPreference::class);
+    }
 }

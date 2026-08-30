@@ -1,0 +1,6 @@
+@extends('layouts.app') @section('title','Pengaturan Notifikasi') @section('content')
+<div class="page-head"><div><h1>Pengaturan Notifikasi</h1><p>Tentukan aktivitas yang ingin Anda terima.</p></div></div>
+<div class="settings-grid">@include('settings.nav')<form class="form-card" method="POST" action="{{ route('settings.notifications.update') }}">@csrf @method('PUT')<h2>Preferensi Notifikasi</h2><p class="muted">Konfigurasi ini tersimpan untuk akun Anda.</p>
+@foreach([['enabled','Aktifkan notifikasi','Kontrol utama untuk seluruh notifikasi.'],['top_up','Notifikasi Top Up','Terima pemberitahuan ketika top up berhasil.'],['nfc_access','Notifikasi Akses NFC','Terima hasil akses NFC berhasil maupun ditolak.'],['transaction','Notifikasi Transaksi','Terima hasil transaksi pembelian outlet.'],['system','Notifikasi Sistem','Terima informasi penting dari sistem.']] as [$name,$label,$description])
+<label class="toggle-row"><span><b>{{ $label }}</b><small>{{ $description }}</small></span><span class="switch"><input type="checkbox" name="{{ $name }}" value="1" @checked(old($name,$preference->{$name}))><span></span></span></label>
+@endforeach<div class="form-actions"><button class="btn btn-primary">Simpan Preferensi</button></div></form></div>@endsection
