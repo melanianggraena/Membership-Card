@@ -22,8 +22,12 @@ class RootScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
-    if (s.session == SessionState.loading) return const SplashScreen();
-    if (s.session == SessionState.guest) return const LoginScreen();
+    if (s.session == SessionState.loading) {
+      return const SplashScreen();
+    }
+    if (s.session == SessionState.guest) {
+      return const LoginScreen();
+    }
     return const MainShell();
   }
 }
@@ -79,19 +83,28 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginState extends State<LoginScreen> {
   final phone = TextEditingController();
+
   Future<void> submit() async {
-    if (phone.text.trim().isEmpty) return;
+    if (phone.text.trim().isEmpty) {
+      return;
+    }
+
     try {
       final debug = await context.read<AppState>().requestOtp(
         phone.text.trim(),
       );
-      if (mounted)
-        open(context, OtpScreen(phone: phone.text.trim(), debugOtp: debug));
+
+      if (!mounted) {
+        return;
+      }
+      open(context, OtpScreen(phone: phone.text.trim(), debugOtp: debug));
     } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<AppState>().error ?? 'Gagal')),
-        );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.read<AppState>().error ?? 'Gagal')),
+      );
     }
   }
 
@@ -203,17 +216,21 @@ class OtpScreen extends StatefulWidget {
 
 class _OtpState extends State<OtpScreen> {
   final otp = TextEditingController();
+
   Future<void> submit() async {
     try {
       await context.read<AppState>().verifyOtp(widget.phone, otp.text);
-      if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
+      if (!mounted) {
+        return;
+      }
+      Navigator.popUntil(context, (r) => r.isFirst);
     } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.read<AppState>().error ?? 'OTP gagal'),
-          ),
-        );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.read<AppState>().error ?? 'OTP gagal')),
+      );
     }
   }
 
@@ -335,7 +352,9 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final s = c.watch<AppState>(), m = s.member;
-    if (m == null) return const SkeletonPage();
+    if (m == null) {
+      return const SkeletonPage();
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -718,7 +737,8 @@ class _HistoryState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<AppState>().loadHistory());
+    final appState = context.read<AppState>(); // Ambil context di sini
+    Future.microtask(() => appState.loadHistory());
   }
 
   @override
@@ -775,7 +795,8 @@ class _TxScreenState extends State<TransactionListScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<AppState>().loadHistory());
+    final appState = context.read<AppState>();
+    Future.microtask(() => appState.loadHistory());
   }
 
   @override
@@ -790,11 +811,12 @@ class TransactionList extends StatelessWidget {
   const TransactionList({super.key, required this.items});
   @override
   Widget build(BuildContext c) {
-    if (items.isEmpty)
+    if (items.isEmpty) {
       return const EmptyState(
         icon: Icons.receipt_long_outlined,
         text: 'Belum ada transaksi',
       );
+    }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
@@ -875,7 +897,8 @@ class _AccessState extends State<AccessHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<AppState>().loadHistory());
+    final appState = context.read<AppState>();
+    Future.microtask(() => appState.loadHistory());
   }
 
   @override
@@ -890,11 +913,12 @@ class AccessList extends StatelessWidget {
   const AccessList({super.key, required this.items});
   @override
   Widget build(BuildContext c) {
-    if (items.isEmpty)
+    if (items.isEmpty) {
       return const EmptyState(
         icon: Icons.meeting_room_outlined,
         text: 'Belum ada riwayat akses',
       );
+    }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
@@ -963,7 +987,8 @@ class _PromoState extends State<PromoScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<AppState>().loadPromos());
+    final appState = context.read<AppState>();
+    Future.microtask(() => appState.loadPromos());
   }
 
   @override
@@ -1143,7 +1168,9 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final s = c.watch<AppState>(), m = s.member;
-    if (m == null) return const SkeletonPage();
+    if (m == null) {
+      return const SkeletonPage();
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -1269,6 +1296,7 @@ class _EditState extends State<EditProfileScreen> {
   late final name = TextEditingController(text: widget.member.name),
       email = TextEditingController(text: widget.member.email),
       phone = TextEditingController(text: widget.member.phone);
+
   Future<void> save() async {
     try {
       await context.read<AppState>().updateProfile(
@@ -1276,17 +1304,20 @@ class _EditState extends State<EditProfileScreen> {
         email.text,
         phone.text,
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil berhasil diperbarui.')),
-        );
-        Navigator.pop(context);
+      if (!mounted) {
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profil berhasil diperbarui.')),
+      );
+      Navigator.pop(context);
     } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<AppState>().error ?? 'Gagal')),
-        );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.read<AppState>().error ?? 'Gagal')),
+      );
     }
   }
 
