@@ -22,4 +22,7 @@ Route::prefix('member')->middleware('auth:sanctum')->group(function () {
     Route::get('/access-history/{id}', [MemberController::class, 'access']);
     Route::get('/promos', [MemberController::class, 'promos']);
     Route::get('/promos/{id}', [MemberController::class, 'promo']);
+    Route::get('/notifications', [MemberController::class, 'notifications']);
+    Route::patch('/notifications/read-all', [MemberController::class, 'readAllNotifications']);
+    Route::patch('/notifications/{id}/read', [MemberController::class, 'readNotification']);
 });

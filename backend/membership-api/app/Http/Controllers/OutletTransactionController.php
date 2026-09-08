@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Member;
 use App\Models\Outlet;
+use App\Models\Promo;
 use App\Models\Transaction;
+use App\Notifications\SystemActivityNotification;
 use App\Services\AdminNotificationService;
 use App\Services\TransactionCodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -20,13 +23,14 @@ class OutletTransactionController extends Controller
         return view('outlet-transactions.create', [
             'outlets' => Outlet::where('status', 'active')->orderBy('outlet_name')->get(),
             'members' => Member::where('status', 'active')->orderBy('full_name')->get(),
+            'promos' => Promo::active()->where('discount_value', '>', 0)->orderBy('title')->get(),
             'selectedMember' => $request->member ? Member::find($request->member) : null,
         ]);
     }
 
     public function store(Request $request, TransactionCodeService $codes, AdminNotificationService $notifications): RedirectResponse
     {
-        $data = $request->validate(['outlet_id' => ['required', 'exists:outlets,id'], 'member_id' => ['required', 'exists:members,id'], 'amount' => ['required', 'numeric', 'gt:0']]);
+        $data = $request->validate(['outlet_id' => ['required', 'exists:outlets,id'], 'member_id' => ['required', 'exists:members,id'], 'amount' => ['required', 'numeric', 'gt:0'], 'promo_id' => ['nullable', 'integer', 'exists:promos,id']]);
 
         try {
             $transaction = DB::transaction(function () use ($data, $request, $codes): Transaction {
@@ -35,23 +39,40 @@ class OutletTransactionController extends Controller
                 if ($outlet->status !== 'active') abort(422, 'Outlet sedang tidak aktif.');
                 if ($member->status !== 'active') abort(422, 'Member sedang tidak aktif.');
 
+                $promo = empty($data['promo_id']) ? null : Promo::lockForUpdate()->findOrFail($data['promo_id']);
+                if ($promo && ($promo->status !== 'active' || $promo->start_date->gt(today()) || $promo->end_date->lt(today()))) {
+                    throw ValidationException::withMessages(['promo_id' => 'Promo sudah tidak berlaku atau tidak aktif.']);
+                }
+
+                $originalAmount = (float) $data['amount'];
+                $discount = $promo?->discountFor($originalAmount) ?? 0;
+                $finalAmount = round($originalAmount - $discount, 2);
                 $before = (float) $member->balance;
-                $success = $before >= (float) $data['amount'];
+                $success = $before >= $finalAmount;
                 $transaction = Transaction::create([
                     'transaction_code' => $codes->next(), 'member_id' => $member->id, 'admin_id' => $request->user()->id,
-                    'outlet_id' => $outlet->id, 'transaction_type' => 'outlet_purchase', 'reference_id' => $outlet->id,
-                    'amount' => $data['amount'], 'balance_before' => $before,
-                    'balance_after' => $success ? $before - (float) $data['amount'] : $before,
+                    'outlet_id' => $outlet->id, 'promo_id' => $promo?->id, 'transaction_type' => 'outlet_purchase', 'reference_id' => $outlet->id,
+                    'original_amount' => $originalAmount, 'discount_amount' => $discount, 'amount' => $finalAmount, 'balance_before' => $before,
+                    'balance_after' => $success ? $before - $finalAmount : $before,
                     'status' => $success ? 'success' : 'failed',
                 ]);
                 if (! $success) return $transaction;
-                $member->update(['balance' => $transaction->balance_after]);
+                $usedAt = now();
+                $member->update(['balance' => $transaction->balance_after, 'last_used' => $usedAt, 'expired_at' => $usedAt->copy()->addYear()]);
                 return $transaction;
             });
+        } catch (ValidationException $exception) {
+            throw $exception;
         } catch (Throwable $exception) {
             report($exception);
             return back()->withInput()->with('error', $exception->getMessage() === 'Outlet sedang tidak aktif.' ? $exception->getMessage() : 'Transaksi gagal diproses. Tidak ada saldo yang dipotong.');
         }
+
+        $transaction->member->notify(new SystemActivityNotification(
+            $transaction->status === 'success' ? 'Pembelian berhasil' : 'Pembelian gagal',
+            $transaction->status === 'success' ? "Transaksi {$transaction->transaction_code} berhasil diproses." : "Saldo tidak mencukupi untuk transaksi {$transaction->transaction_code}.",
+            'transaction'
+        ));
 
         $transaction->load(['member', 'outlet']);
         if ($transaction->status === 'failed') {

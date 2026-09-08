@@ -16,11 +16,14 @@ class MemberController extends Controller
     public function updateProfile(Request $r) { $m = $r->user(); $m->update($r->validate(['full_name' => ['required','string','max:255'], 'email' => ['nullable','email',Rule::unique('members')->ignore($m)], 'phone' => ['required','string','max:30',Rule::unique('members')->ignore($m)]])); return $this->ok($this->member($r), 'Profil berhasil diperbarui.'); }
     public function membership(Request $r) { return $this->ok($this->member($r)); }
     public function balance(Request $r) { return $this->ok(['balance' => (float) $r->user()->balance]); }
-    public function home(Request $r) { return $this->ok(['member' => $this->member($r), 'promos' => Promo::active()->latest('start_date')->get()]); }
-    public function transactions(Request $r) { return $this->ok($r->user()->transactions()->with(['room:id,room_name', 'outlet:id,outlet_code,outlet_name'])->latest()->paginate(15)); }
-    public function transaction(Request $r, int $id) { return $this->ok($r->user()->transactions()->with(['room:id,room_name', 'outlet:id,outlet_code,outlet_name'])->findOrFail($id)); }
+    public function home(Request $r) { return $this->ok(['member' => $this->member($r), 'promos' => Promo::active()->latest('start_date')->get(), 'unread_notifications' => $r->user()->unreadNotifications()->count()]); }
+    public function transactions(Request $r) { return $this->ok($r->user()->transactions()->with(['room:id,room_name', 'outlet:id,outlet_code,outlet_name', 'promo:id,title'])->latest()->paginate(15)); }
+    public function transaction(Request $r, int $id) { return $this->ok($r->user()->transactions()->with(['room:id,room_name', 'outlet:id,outlet_code,outlet_name', 'promo:id,title'])->findOrFail($id)); }
     public function accesses(Request $r) { return $this->ok($r->user()->accessHistories()->with('room:id,room_name')->latest('scanned_at')->paginate(15)); }
     public function access(Request $r, int $id) { return $this->ok($r->user()->accessHistories()->with('room:id,room_name')->findOrFail($id)); }
     public function promos() { return $this->ok(Promo::active()->latest('start_date')->get()); }
     public function promo(int $id) { return $this->ok(Promo::active()->findOrFail($id)); }
+    public function notifications(Request $r) { return $this->ok(['items' => $r->user()->notifications()->latest()->paginate(15), 'unread_count' => $r->user()->unreadNotifications()->count()]); }
+    public function readNotification(Request $r, string $id) { $r->user()->notifications()->findOrFail($id)->markAsRead(); return $this->ok(['unread_count' => $r->user()->unreadNotifications()->count()], 'Notifikasi ditandai sudah dibaca.'); }
+    public function readAllNotifications(Request $r) { $r->user()->unreadNotifications->markAsRead(); return $this->ok(['unread_count' => 0], 'Semua notifikasi ditandai sudah dibaca.'); }
 }

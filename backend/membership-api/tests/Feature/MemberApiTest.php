@@ -7,6 +7,7 @@ use App\Models\Promo;
 use App\Models\Outlet;
 use App\Models\Room;
 use App\Models\Transaction;
+use App\Notifications\SystemActivityNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -45,5 +46,17 @@ class MemberApiTest extends TestCase
             ->assertJsonFragment(['room_name' => 'Room A'])
             ->assertJsonFragment(['transaction_code' => 'TRX-20260830-000002', 'transaction_type' => 'outlet_purchase'])
             ->assertJsonFragment(['outlet_name' => 'Resto']);
+    }
+
+    public function test_member_can_list_and_read_notifications(): void
+    {
+        $member = Member::create(['member_code' => '202608010', 'full_name' => 'Notification Member', 'phone' => '081200000010', 'balance' => 100000, 'status' => 'active']);
+        $member->notify(new SystemActivityNotification('Pembelian berhasil', 'Transaksi berhasil diproses.', 'transaction'));
+        $notification = $member->fresh()->unreadNotifications()->firstOrFail();
+
+        Sanctum::actingAs($member, ['member:read']);
+        $this->getJson('/api/member/notifications')->assertOk()->assertJsonPath('data.unread_count', 1)->assertJsonPath('data.items.data.0.data.title', 'Pembelian berhasil');
+        $this->patchJson("/api/member/notifications/{$notification->id}/read")->assertOk()->assertJsonPath('data.unread_count', 0);
+        $this->assertNotNull($notification->fresh()->read_at);
     }
 }
