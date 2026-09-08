@@ -18,6 +18,10 @@ class AppState extends ChangeNotifier {
   List<Promo> promos = [];
   List<Tx> transactions = [];
   List<AccessItem> accesses = [];
+  List<MemberNotification> notifications = [];
+  int unreadNotifications = 0;
+  bool notificationsBusy = false;
+  String? notificationsError;
   String? error;
   bool busy = false;
   Future<void> restore() async {
@@ -84,6 +88,7 @@ class AppState extends ChangeNotifier {
     promos = (r.data['data']['promos'] as List)
         .map((e) => Promo.fromJson(e))
         .toList();
+    unreadNotifications = r.data['data']['unread_notifications'] ?? 0;
     notifyListeners();
   }
 
@@ -114,6 +119,36 @@ class AppState extends ChangeNotifier {
       error = api.message(e);
     }
     notifyListeners();
+  }
+
+  Future<void> loadNotifications() async {
+    notificationsBusy = true;
+    notificationsError = null;
+    notifyListeners();
+    try {
+      final r = await api.dio.get('/member/notifications');
+      final data = r.data['data'];
+      notifications = ((data['items']['data'] ?? []) as List)
+          .map((e) => MemberNotification.fromJson(e))
+          .toList();
+      unreadNotifications = data['unread_count'] ?? 0;
+    } catch (e) {
+      notificationsError = api.message(e);
+    } finally {
+      notificationsBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> readNotification(MemberNotification item) async {
+    if (!item.unread) return;
+    await api.dio.patch('/member/notifications/${item.id}/read');
+    await loadNotifications();
+  }
+
+  Future<void> readAllNotifications() async {
+    await api.dio.patch('/member/notifications/read-all');
+    await loadNotifications();
   }
 
   Future<void> updateProfile(String name, String email, String phone) async {

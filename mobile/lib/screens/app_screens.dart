@@ -363,8 +363,12 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: const Badge(child: Icon(Icons.notifications_outlined)),
+            onPressed: () => open(c, const NotificationScreen()),
+            icon: Badge(
+              isLabelVisible: s.unreadNotifications > 0,
+              label: Text('${s.unreadNotifications}'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
           ),
         ],
       ),
@@ -458,6 +462,95 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class NotificationScreen extends StatefulWidget {
+  const NotificationScreen({super.key});
+  @override
+  State<NotificationScreen> createState() => _NotificationScreenState();
+}
+
+class _NotificationScreenState extends State<NotificationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    final appState = context.read<AppState>();
+    Future.microtask(appState.loadNotifications);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Notifikasi'),
+        actions: [
+          if (state.unreadNotifications > 0)
+            TextButton(
+              onPressed: state.readAllNotifications,
+              child: const Text('Baca semua'),
+            ),
+        ],
+      ),
+      body: state.notificationsBusy
+          ? const Center(child: CircularProgressIndicator())
+          : state.notificationsError != null
+          ? ErrorState(
+              message: state.notificationsError!,
+              retry: state.loadNotifications,
+            )
+          : state.notifications.isEmpty
+          ? const EmptyState(
+              icon: Icons.notifications_none,
+              text: 'Belum ada notifikasi',
+            )
+          : RefreshIndicator(
+              onRefresh: state.loadNotifications,
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: state.notifications.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, index) {
+                  final item = state.notifications[index];
+                  return Card(
+                    color: item.unread ? const Color(0xfffff4f6) : Colors.white,
+                    child: ListTile(
+                      onTap: () => state.readNotification(item),
+                      leading: CircleAvatar(
+                        backgroundColor: item.unread
+                            ? const Color(0xffffdce4)
+                            : const Color(0xfff1f3f5),
+                        child: Icon(
+                          Icons.notifications_outlined,
+                          color: item.unread ? crimson : muted,
+                        ),
+                      ),
+                      title: Text(
+                        item.title,
+                        style: TextStyle(
+                          fontWeight: item.unread
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${item.description}\n${item.createdAt == null ? '-' : DateFormat('dd MMM yyyy, HH:mm').format(item.createdAt!.toLocal())}',
+                      ),
+                      isThreeLine: true,
+                      trailing: item.unread
+                          ? const Icon(Icons.circle, size: 10, color: crimson)
+                          : const Icon(
+                              Icons.check,
+                              size: 18,
+                              color: Colors.green,
+                            ),
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }
@@ -823,6 +916,11 @@ class TransactionList extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (_, i) {
         final t = items[i], plus = t.type == 'top_up';
+        final title = t.type == 'top_up'
+            ? 'Top Up'
+            : t.type == 'outlet_purchase'
+            ? 'Pembelian Outlet'
+            : 'Akses Ruangan';
         return Card(
           child: ListTile(
             onTap: () => open(c, TransactionDetailScreen(item: t)),
@@ -836,11 +934,11 @@ class TransactionList extends StatelessWidget {
               ),
             ),
             title: Text(
-              plus ? 'Top Up' : 'Room Access',
+              title,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             subtitle: Text(
-              '${fd(t.date)}${t.room == null ? '' : ' • ${t.room}'}',
+              '${t.code}\n${fd(t.date)}${t.room == null && t.outlet == null ? '' : ' • ${t.room ?? t.outlet}'}',
             ),
             trailing: Text(
               '${plus ? '+' : '-'} ${rupiah.format(t.amount)}',
@@ -866,16 +964,23 @@ class TransactionDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         InfoCard(
-          title: item.type == 'top_up' ? 'Top Up' : 'Room Access',
+          title: item.type == 'top_up'
+              ? 'Top Up'
+              : item.type == 'outlet_purchase'
+              ? 'Pembelian Outlet'
+              : 'Akses Ruangan',
           value: rupiah.format(item.amount),
         ),
         const SizedBox(height: 16),
         DetailCard(
           rows: {
-            'Transaction ID': '#${item.id}',
+            'Kode transaksi': item.code,
             'Jenis transaksi': item.type,
-            'Nominal': rupiah.format(item.amount),
-            'Room': item.room ?? '-',
+            'Harga awal': rupiah.format(item.originalAmount),
+            'Promo': item.promo ?? '-',
+            'Diskon': rupiah.format(item.discount),
+            'Total': rupiah.format(item.amount),
+            'Outlet / Room': item.outlet ?? item.room ?? '-',
             'Tanggal': fd(item.date),
             'Saldo sebelum': rupiah.format(item.before),
             'Saldo sesudah': rupiah.format(item.after),
@@ -1063,6 +1168,16 @@ class PromoCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                if (promo.discountValue > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Diskon ${promo.discountLabel}',
+                    style: const TextStyle(
+                      color: crimson,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Text(
                   promo.description,
@@ -1126,6 +1241,17 @@ class PromoDetailScreen extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (promo.discountValue > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Diskon ${promo.discountLabel}',
+                  style: const TextStyle(
+                    color: crimson,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               Text(
                 '${fd(promo.start)} – ${fd(promo.end)}',

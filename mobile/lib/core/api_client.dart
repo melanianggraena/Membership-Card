@@ -6,7 +6,7 @@ class ApiClient {
   
   // ---> BAGIAN YANG DIUBAH <---
   // Mengubah IP localhost/emulator menjadi IP Address komputer/server Anda (192.168.1.6)
-  static String get defaultBaseUrl => 'http://192.168.1.6:8000/api';
+  static String get defaultBaseUrl => 'http://192.168.1.233:8000/api';
   
   late final Dio dio;
   Future<void> Function()? onUnauthorized;
