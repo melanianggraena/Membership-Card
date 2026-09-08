@@ -19,6 +19,7 @@
         @include('layouts.footer')
     </div>
 </div>
+<div class="sidebar-backdrop" data-sidebar-close></div>
 <div class="modal-backdrop" id="modalBackdrop"></div>
 @stack('modals')
 </body>

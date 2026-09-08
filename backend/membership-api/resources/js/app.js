@@ -1,9 +1,21 @@
 import { createIcons, icons } from 'lucide';
 
 document.addEventListener('DOMContentLoaded', () => {
-    createIcons({ icons });
+    const renderIcons = () => createIcons({ icons, attrs: { 'aria-hidden': 'true' } });
+    renderIcons();
     const sidebar = document.querySelector('#sidebar');
-    document.querySelector('[data-sidebar-toggle]')?.addEventListener('click', () => sidebar?.classList.toggle('open'));
+    const sidebarBackdrop = document.querySelector('[data-sidebar-close]');
+    const closeSidebar = () => {
+        sidebar?.classList.remove('open');
+        sidebarBackdrop?.classList.remove('open');
+    };
+    document.querySelector('[data-sidebar-toggle]')?.addEventListener('click', () => {
+        sidebar?.classList.toggle('open');
+        sidebarBackdrop?.classList.toggle('open');
+    });
+    sidebarBackdrop?.addEventListener('click', closeSidebar);
+    sidebar?.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', closeSidebar));
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeSidebar(); });
     document.querySelector('[data-toggle-password]')?.addEventListener('click', () => {
         const input = document.querySelector('#password');
         if (input) input.type = input.type === 'password' ? 'text' : 'password';
