@@ -1,4 +1,3 @@
-```blade
 @extends('layouts.app')
 
 @section('title', 'Manajemen Ruangan')
@@ -186,4 +185,3 @@
 </div>
 
 @endpush
-```

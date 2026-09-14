@@ -39,8 +39,12 @@
         >
             @csrf
 
-            <div class="mobile-brand">
-                Technolife
+            <div class="login-logo" aria-label="Technolife">
+                <div class="login-logo-mark"><i data-lucide="building-2"></i></div>
+                <div class="login-logo-copy">
+                    <strong>Technolife</strong>
+                    <small>MEMBERSHIP TECHNOLIFE</small>
+                </div>
             </div>
 
             <span class="eyebrow">SELAMAT DATANG</span>
