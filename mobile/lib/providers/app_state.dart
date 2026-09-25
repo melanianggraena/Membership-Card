@@ -25,20 +25,23 @@ class AppState extends ChangeNotifier {
   String? error;
   bool busy = false;
   Future<void> restore() async {
-    final token = await api.token();
-    if (token == null) {
-      session = SessionState.guest;
-      notifyListeners();
-      return;
-    }
     try {
-      await loadHome();
+      final token = await api.token();
+      if (token == null) {
+        session = SessionState.guest;
+        notifyListeners();
+        return;
+      }
+      await loadHome().timeout(const Duration(seconds: 4));
       session = SessionState.authenticated;
     } catch (_) {
-      await api.clearToken();
+      try {
+        await api.clearToken();
+      } catch (_) {}
       session = SessionState.guest;
+    } finally {
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<String?> requestOtp(String phone) async {

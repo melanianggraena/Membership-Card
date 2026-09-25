@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AccessHistory;
 use App\Models\Member;
+use App\Models\Promo;
 use App\Models\Room;
 use App\Models\TopUp;
 use App\Models\Transaction;
@@ -12,6 +13,8 @@ class DashboardController extends Controller
 {
     public function index()
     {
+        Promo::deactivateExpired();
+
         return view('dashboard.index', [
             'stats' => [
                 'members' => Member::count(),

@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/scan-nfc', [AdminPanelController::class, 'scan'])->name('scan.index');
     Route::post('/scan-nfc', [AdminPanelController::class, 'scanStore'])->name('scan.store');
     Route::get('/transactions', [AdminPanelController::class, 'transactions'])->name('transactions.index');
+    Route::get('/transactions/export/csv', [AdminPanelController::class, 'exportTransactionsCsv'])->name('transactions.export');
     Route::get('/transactions/outlet/create', [OutletTransactionController::class, 'create'])->name('outlet-transactions.create');
     Route::post('/transactions/outlet', [OutletTransactionController::class, 'store'])->name('outlet-transactions.store');
     Route::get('/transactions/{transaction}', [AdminPanelController::class, 'transaction'])->name('transactions.show');

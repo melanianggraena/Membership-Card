@@ -12,7 +12,31 @@ class Promo extends Model
     protected $appends = ['image_url'];
     protected function casts(): array { return ['discount_value' => 'decimal:2', 'start_date' => 'date', 'end_date' => 'date']; }
     public function getImageUrlAttribute(): ?string { return $this->image_path ? url(Storage::disk('public')->url($this->image_path)) : null; }
-    public function scopeActive($query) { return $query->where('status', 'active')->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today()); }
+    public static function deactivateExpired(): int
+    {
+        return static::where('status', 'active')
+            ->whereDate('end_date', '<', today())
+            ->update(['status' => 'inactive']);
+    }
+
+    public function scopeActive($query)
+    {
+        static::deactivateExpired();
+        return $query->where('status', 'active')
+            ->whereDate('start_date', '<=', today())
+            ->whereDate('end_date', '>=', today());
+    }
+
+    protected static function booted(): void
+    {
+        static::retrieved(function (Promo $promo) {
+            if ($promo->status === 'active' && $promo->end_date && $promo->end_date->lt(today())) {
+                $promo->status = 'inactive';
+                $promo->saveQuietly();
+            }
+        });
+    }
+
     public function transactions() { return $this->hasMany(Transaction::class); }
 
     public function discountFor(float $amount): float

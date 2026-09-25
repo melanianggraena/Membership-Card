@@ -9,7 +9,11 @@ use Illuminate\Validation\Rule;
 
 class PromoController extends Controller
 {
-    public function index(Request $r) { $promos = Promo::query()->when($r->status, fn($q,$v) => $q->where('status',$v))->latest()->paginate(10)->withQueryString(); return view('promos.index', compact('promos')); }
+    public function index(Request $r) {
+        Promo::deactivateExpired();
+        $promos = Promo::query()->when($r->status, fn($q,$v) => $q->where('status',$v))->latest()->paginate(10)->withQueryString();
+        return view('promos.index', compact('promos'));
+    }
     public function create() { return view('promos.form'); }
     public function edit(Promo $promo) { return view('promos.form', compact('promo')); }
     public function store(Request $r) { Promo::create($this->validated($r)); return redirect()->route('promos.index')->with('success', 'Promo berhasil ditambahkan.'); }

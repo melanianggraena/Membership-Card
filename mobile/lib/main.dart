@@ -4,12 +4,15 @@ import 'core/api_client.dart';
 import 'providers/app_state.dart';
 import 'screens/app_screens.dart';
 
-void main() => runApp(
-  ChangeNotifierProvider(
-    create: (_) => AppState(ApiClient())..restore(),
-    child: const TechnolifeApp(),
-  ),
-);
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AppState(ApiClient())..restore(),
+      child: const TechnolifeApp(),
+    ),
+  );
+}
 
 class TechnolifeApp extends StatelessWidget {
   const TechnolifeApp({super.key});
