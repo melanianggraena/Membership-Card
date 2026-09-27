@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AccessHistory;
 use App\Models\Admin;
 use App\Models\Member;
+use App\Models\Outlet;
 use App\Models\Room;
 use App\Models\TopUp;
 use App\Models\Transaction;
@@ -112,7 +113,103 @@ class AdminPanelController extends Controller
         return back()->with($result['success'] ? 'success' : 'error', $result['reason']);
     }
 
-    public function transactions(Request $request) { $transactions = Transaction::with(['member', 'admin', 'room', 'outlet', 'promo'])->when($request->type, fn ($q, $v) => $q->where('transaction_type', $v))->when($request->status, fn ($q, $v) => $q->where('status', $v))->when($request->search, fn ($q, $v) => $q->where(fn ($q) => $q->where('transaction_code', 'like', "%{$v}%")->orWhereHas('member', fn ($q) => $q->where('member_code', 'like', "%{$v}%")->orWhere('full_name', 'like', "%{$v}%"))))->latest()->paginate(12)->withQueryString(); return view('transactions.index', compact('transactions')); }
+    private function filterTransactions(Request $request)
+    {
+        return Transaction::with(['member', 'admin', 'room', 'outlet', 'promo'])
+            ->when($request->type, fn ($q, $v) => $q->where('transaction_type', $v))
+            ->when($request->status, fn ($q, $v) => $q->where('status', $v))
+            ->when($request->outlet_id, fn ($q, $v) => $q->where('outlet_id', $v))
+            ->when($request->start_date, fn ($q, $v) => $q->whereDate('created_at', '>=', $v))
+            ->when($request->end_date, fn ($q, $v) => $q->whereDate('created_at', '<=', $v))
+            ->when($request->filled('min_amount'), fn ($q) => $q->where('amount', '>=', (float) $request->min_amount))
+            ->when($request->filled('max_amount'), fn ($q) => $q->where('amount', '<=', (float) $request->max_amount))
+            ->when($request->search, fn ($q, $v) => $q->where(fn ($q) => $q->where('transaction_code', 'like', "%{$v}%")
+                ->orWhereHas('member', fn ($q) => $q->where('member_code', 'like', "%{$v}%")->orWhere('full_name', 'like', "%{$v}%"))
+            ));
+    }
+
+    public function transactions(Request $request)
+    {
+        $outlets = Outlet::orderBy('outlet_name')->get();
+        $transactions = $this->filterTransactions($request)
+            ->latest()
+            ->paginate(12)
+            ->withQueryString();
+
+        return view('transactions.index', compact('transactions', 'outlets'));
+    }
+
+    public function exportTransactionsCsv(Request $request)
+    {
+        $transactions = $this->filterTransactions($request)
+            ->latest()
+            ->get();
+
+        $filename = 'laporan-transaksi-' . now()->format('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($transactions) {
+            $handle = fopen('php://output', 'w');
+
+            // UTF-8 BOM so Microsoft Excel renders characters and symbols correctly
+            fputs($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Kode Transaksi',
+                'Waktu Transaksi',
+                'Kode Member',
+                'Nama Member',
+                'No Handphone',
+                'Jenis Transaksi',
+                'Outlet / Ruangan',
+                'Promo Digunakan',
+                'Nominal Asli (Rp)',
+                'Diskon (Rp)',
+                'Total Akhir (Rp)',
+                'Saldo Sebelum (Rp)',
+                'Saldo Sesudah (Rp)',
+                'Status',
+                'Admin / Kasir',
+            ]);
+
+            $typeLabels = [
+                'top_up' => 'Top Up Saldo',
+                'room_access' => 'Akses Ruangan',
+                'outlet_purchase' => 'Pembelian Outlet',
+            ];
+
+            foreach ($transactions as $t) {
+                fputcsv($handle, [
+                    $t->transaction_code,
+                    $t->created_at ? $t->created_at->format('Y-m-d H:i:s') : '-',
+                    $t->member?->member_code ?? '-',
+                    $t->member?->full_name ?? '-',
+                    $t->member?->phone ?? '-',
+                    $typeLabels[$t->transaction_type] ?? $t->transaction_type,
+                    $t->outlet?->outlet_name ?? $t->room?->room_name ?? '-',
+                    $t->promo?->title ?? '-',
+                    (float) ($t->original_amount ?? $t->amount),
+                    (float) ($t->discount_amount ?? 0),
+                    (float) $t->amount,
+                    (float) $t->balance_before,
+                    (float) $t->balance_after,
+                    $t->status === 'success' ? 'Berhasil' : 'Gagal',
+                    $t->admin?->name ?? '-',
+                ]);
+            }
+
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
     public function transaction(Transaction $transaction) { $transaction->load(['member', 'admin', 'room', 'outlet', 'promo']); return view('transactions.show', compact('transaction')); }
     public function accesses(Request $request) { $accesses = AccessHistory::with(['member', 'room'])->when($request->status, fn ($q, $v) => $q->where('access_status', $v))->latest('scanned_at')->paginate(12)->withQueryString(); return view('accesses.index', compact('accesses')); }
 

@@ -2,11 +2,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  static const _storage = FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+  );
   
   // ---> BAGIAN YANG DIUBAH <---
   // Mengubah IP localhost/emulator menjadi IP Address komputer/server Anda (192.168.1.6)
-  static String get defaultBaseUrl => 'http://192.168.1.233:8000/api';
+  static String get defaultBaseUrl => 'http://192.168.1.116:8000/api';
   
   late final Dio dio;
   Future<void> Function()? onUnauthorized;
@@ -29,10 +34,12 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (o, h) async {
-          final token = await _storage.read(key: 'member_token');
-          if (token != null) {
-            o.headers['Authorization'] = 'Bearer $token';
-          }
+          try {
+            final token = await _storage.read(key: 'member_token');
+            if (token != null) {
+              o.headers['Authorization'] = 'Bearer $token';
+            }
+          } catch (_) {}
           h.next(o);
         },
         onError: (e, h) async {
@@ -46,12 +53,25 @@ class ApiClient {
     );
   }
   
-  Future<String?> token() => _storage.read(key: 'member_token');
+  Future<String?> token() async {
+    try {
+      return await _storage.read(key: 'member_token');
+    } catch (_) {
+      return null;
+    }
+  }
   
-  Future<void> saveToken(String value) =>
-      _storage.write(key: 'member_token', value: value);
+  Future<void> saveToken(String value) async {
+    try {
+      await _storage.write(key: 'member_token', value: value);
+    } catch (_) {}
+  }
       
-  Future<void> clearToken() => _storage.delete(key: 'member_token');
+  Future<void> clearToken() async {
+    try {
+      await _storage.delete(key: 'member_token');
+    } catch (_) {}
+  }
   
   String message(Object e) {
     if (e is DioException) {
