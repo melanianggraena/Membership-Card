@@ -1,14 +1,14 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AdminPanelController;
 use App\Http\Controllers\Auth\AdminAuthController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\AdminPanelController;
-use App\Http\Controllers\PromoController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OutletController;
 use App\Http\Controllers\OutletTransactionController;
+use App\Http\Controllers\PromoController;
 use App\Http\Controllers\SettingsController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -25,6 +25,12 @@ Route::get('/login', [AdminAuthController::class, 'showLogin'])
 
 Route::post('/login', [AdminAuthController::class, 'login'])
     ->name('login.process');
+
+Route::get('/auth/keycloak', [AdminAuthController::class, 'redirectToKeycloak'])
+    ->name('keycloak.redirect');
+
+Route::get('/auth/keycloak/callback', [AdminAuthController::class, 'handleKeycloakCallback'])
+    ->name('keycloak.callback');
 
 Route::post('/logout', [AdminAuthController::class, 'logout'])
     ->name('logout');

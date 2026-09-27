@@ -109,6 +109,19 @@
                 Masuk
                 <i data-lucide="arrow-right"></i>
             </button>
+
+            <div class="login-divider"><span>atau</span></div>
+
+            <a
+                class="btn btn-keycloak btn-block"
+                href="{{ route('keycloak.redirect') }}"
+            >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 3.5 20 8v8l-8 4.5L4 16V8l8-4.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                    <path d="m8 10 4 2.3 4-2.3M12 12.3V17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Masuk dengan SSO
+            </a>
         </form>
     </main>
 
